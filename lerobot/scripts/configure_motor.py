@@ -14,6 +14,8 @@
 """
 This script configure a single motor at a time to a given ID and baudrate.
 
+Lewansoul: Use different script, please don't run this
+
 Example of usage:
 ```bash
 python lerobot/scripts/configure_motor.py \
@@ -40,6 +42,16 @@ def get_motor_bus_cls(brand: str) -> tuple:
 
         return FeetechMotorsBusConfig, FeetechMotorsBus, MODEL_BAUDRATE_TABLE, SCS_SERIES_BAUDRATE_TABLE
 
+    elif brand == "lewansoul":
+        from lerobot.common.robot_devices.motors.configs import LewansoulMotorsBusConfig
+        from lerobot.common.robot_devices.motors.lewansoul import (
+            MODEL_BAUDRATE_TABLE,
+            LX16A_SERIES_BAUDRATE_TABLE,
+            LewansoulMotorsBus,
+        )
+
+        return LewansoulMotorsBusConfig, LewansoulMotorsBus, MODEL_BAUDRATE_TABLE, LX16A_SERIES_BAUDRATE_TABLE
+    
     elif brand == "dynamixel":
         from lerobot.common.robot_devices.motors.configs import DynamixelMotorsBusConfig
         from lerobot.common.robot_devices.motors.dynamixel import (
@@ -164,9 +176,9 @@ def configure_motor(port, brand, model, motor_idx_des, baudrate_des):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=str, required=True, help="Motors bus port (e.g. dynamixel,feetech)")
-    parser.add_argument("--brand", type=str, required=True, help="Motor brand (e.g. dynamixel,feetech)")
-    parser.add_argument("--model", type=str, required=True, help="Motor model (e.g. xl330-m077,sts3215)")
+    parser.add_argument("--port", type=str, required=True, help="Motors bus port (e.g. dynamixel,feetech, rebearm)")
+    parser.add_argument("--brand", type=str, required=True, help="Motor brand (e.g. dynamixel,feetech, lewansoul)")
+    parser.add_argument("--model", type=str, required=True, help="Motor model (e.g. xl330-m077,sts3215,lx16a)")
     parser.add_argument("--ID", type=int, required=True, help="Desired ID of the current motor (e.g. 1,2,3)")
     parser.add_argument(
         "--baudrate", type=int, default=1000000, help="Desired baudrate for the motor (default: 1000000)"

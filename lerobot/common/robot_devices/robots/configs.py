@@ -26,6 +26,7 @@ from lerobot.common.robot_devices.cameras.configs import (
 from lerobot.common.robot_devices.motors.configs import (
     DynamixelMotorsBusConfig,
     FeetechMotorsBusConfig,
+    LewansoulMotorsBusConfig,
     MotorsBusConfig,
 )
 
@@ -556,6 +557,67 @@ class So100RobotConfig(ManipulatorRobotConfig):
 
     mock: bool = False
 
+@RobotConfig.register_subclass("rebearm")
+@dataclass
+class RebearmRobotConfig(ManipulatorRobotConfig):
+    calibration_dir: str = ".cache/calibration/rebearm"
+    # `max_relative_target` limits the magnitude of the relative positional target vector for safety purposes.
+    # Set this to a positive scalar to have the same value for all motors, or a list that is the same length as
+    # the number of motors in your follower arms.
+    max_relative_target: int | None = None
+
+    leader_arms: dict[str, MotorsBusConfig] = field(
+        default_factory=lambda: {
+            "main": LewansoulMotorsBusConfig(
+                port="/dev/ttyUSB0",
+                motors={
+                    # name: (index, model)
+                    "shoulder_pan": [1, "lx16a"],
+                    "shoulder_lift": [2, "lx16a"],
+                    "elbow_flex": [3, "lx16a"],
+                    "wrist_flex": [4, "lx16a"],
+                    "wrist_roll": [5, "lx16a"],
+                    "gripper": [6, "lx16a"],
+                },
+            ),
+        }
+    )
+
+    follower_arms: dict[str, MotorsBusConfig] = field(
+        default_factory=lambda: {
+            "main": LewansoulMotorsBusConfig(
+                port="/dev/ttyUSB1",
+                motors={
+                    # name: (index, model)
+                    "shoulder_pan": [1, "lx16a"],
+                    "shoulder_lift": [2, "lx16a"],
+                    "elbow_flex": [3, "lx16a"],
+                    "wrist_flex": [4, "lx16a"],
+                    "wrist_roll": [5, "lx16a"],
+                    "gripper": [6, "lx16a"],
+                },
+            ),
+        }
+    )
+
+    cameras: dict[str, CameraConfig] = field(
+        default_factory=lambda: {
+            "laptop": OpenCVCameraConfig(
+                camera_index=0,
+                fps=30,
+                width=640,
+                height=480,
+            ),
+            "phone": OpenCVCameraConfig(
+                camera_index=1,
+                fps=30,
+                width=640,
+                height=480,
+            ),
+        }
+    )
+
+    mock: bool = False
 
 @RobotConfig.register_subclass("stretch")
 @dataclass

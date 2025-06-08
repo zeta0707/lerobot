@@ -245,6 +245,8 @@ class ManipulatorRobot:
             from lerobot.common.robot_devices.motors.dynamixel import TorqueMode
         elif self.robot_type in ["so100", "so101", "moss", "lekiwi"]:
             from lerobot.common.robot_devices.motors.feetech import TorqueMode
+        elif self.robot_type in ["rebearm"]:
+            from lerobot.common.robot_devices.motors.lewansoul import TorqueMode
 
         # We assume that at connection time, arms are in a rest position, and torque can
         # be safely disabled to run calibration and/or set robot preset configurations.
@@ -262,6 +264,8 @@ class ManipulatorRobot:
             self.set_aloha_robot_preset()
         elif self.robot_type in ["so100", "so101", "moss", "lekiwi"]:
             self.set_so100_robot_preset()
+        elif self.robot_type == "rebearm":
+            self.set_rebearm_robot_preset()
 
         # Enable torque on all motors of the follower arms
         for name in self.follower_arms:
@@ -301,7 +305,11 @@ class ManipulatorRobot:
             arm_id = get_arm_id(name, arm_type)
             arm_calib_path = self.calibration_dir / f"{arm_id}.json"
 
-            if arm_calib_path.exists():
+            if self.robot_type in ["rebearm"]:
+                print("No calibration needed")
+                return True
+
+            elif arm_calib_path.exists():
                 with open(arm_calib_path) as f:
                     calibration = json.load(f)
             else:
@@ -442,6 +450,10 @@ class ManipulatorRobot:
             self.follower_arms[name].write("Maximum_Acceleration", 254)
             self.follower_arms[name].write("Acceleration", 254)
 
+    def set_rebearm_robot_preset(self):
+        for name in self.follower_arms:
+            print("Rebearm preset nothing")
+
     def teleop_step(
         self, record_data=False
     ) -> None | tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
@@ -475,6 +487,7 @@ class ManipulatorRobot:
             follower_goal_pos[name] = goal_pos
 
             goal_pos = goal_pos.numpy().astype(np.float32)
+            print('goal_pos:', goal_pos)
             self.follower_arms[name].write("Goal_Position", goal_pos)
             self.logs[f"write_follower_{name}_goal_pos_dt_s"] = time.perf_counter() - before_fwrite_t
 

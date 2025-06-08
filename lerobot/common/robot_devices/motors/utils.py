@@ -44,6 +44,10 @@ def make_motors_buses_from_configs(motors_bus_configs: dict[str, MotorsBusConfig
 
             motors_buses[key] = FeetechMotorsBus(cfg)
 
+        elif cfg.type == "lewansoul":
+            from lerobot.common.robot_devices.motors.lewansoul import LewansoulMotorsBus
+
+            motors_buses[key] = LewansoulMotorsBus(cfg)
         else:
             raise ValueError(f"The motor type '{cfg.type}' is not valid.")
 
@@ -63,5 +67,11 @@ def make_motors_bus(motor_type: str, **kwargs) -> MotorsBus:
         config = FeetechMotorsBusConfig(**kwargs)
         return FeetechMotorsBus(config)
 
+    elif motor_type == "lewansoul":
+        from lerobot.common.robot_devices.motors.lewansoul import LewansoulMotorsBus
+
+        config = LewansoulMotorsBus(**kwargs)
+        return LewansoulMotorsBus(config)
+    
     else:
         raise ValueError(f"The motor type '{motor_type}' is not valid.")
