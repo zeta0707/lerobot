@@ -264,6 +264,8 @@ def control_loop(
                 # Action can eventually be clipped using `max_relative_target`,
                 # so action actually sent is saved in the dataset.
                 action = robot.send_action(pred_action)
+                #workaround
+                action = action.to(dtype=torch.float32) 
                 action = {"action": action}
 
         if dataset is not None:

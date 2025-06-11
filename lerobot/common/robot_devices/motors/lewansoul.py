@@ -314,7 +314,7 @@ class LewansoulMotorsBus:
         values = []
         for idx in motor_ids:
             packet = [idx, 3, addr]
-            print('packet:', packet)
+            #print('ReadPkt:', packet)
             LX16A._send_packet(packet)
 
             #need to modify or extend, servo angle type
@@ -368,7 +368,7 @@ class LewansoulMotorsBus:
                 packet = [idx, bytes+3, addr, *LX16A._to_bytes(value), *LX16A._to_bytes(100)]
             else:
                 packet = [idx, bytes+3, addr, value]
-            print('packet:', packet)
+            #print('WritePKT:', packet)
             LX16A._send_packet(packet)
 
     def disconnect(self):
