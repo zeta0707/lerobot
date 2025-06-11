@@ -330,7 +330,7 @@ class LewansoulMotorsBus:
             values.append(value)
 
         print(values)
-        values = np.array(values)
+        values = np.array(values, dtype=np.float32)
         return values
     
     def write(self, data_name, values: int | float | np.ndarray, motor_names: str | list[str] | None = None):

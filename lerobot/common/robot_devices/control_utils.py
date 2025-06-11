@@ -253,6 +253,9 @@ def control_loop(
 
         if teleoperate:
             observation, action = robot.teleop_step(record_data=True)
+            #workaround somehow action was torch.float64
+            #action['action'] = action['action'].to(torch.float32)
+            #observation['observation.state'] = observation['observation.state'].to(torch.float32)
         else:
             observation = robot.capture_observation()
             action = None
@@ -264,8 +267,6 @@ def control_loop(
                 # Action can eventually be clipped using `max_relative_target`,
                 # so action actually sent is saved in the dataset.
                 action = robot.send_action(pred_action)
-                #workaround
-                action = action.to(dtype=torch.float32) 
                 action = {"action": action}
 
         if dataset is not None:
