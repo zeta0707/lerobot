@@ -211,7 +211,7 @@ class LewansoulMotorsBus:
 
     def find_motor_indices(self, possible_ids=None, num_retry=2):
         #return motor id array
-        indices = [1,2,3,4,5,6]
+        indices = list(range(1, MAX_ID_RANGE+1))
         return indices
 
     def set_bus_baudrate(self, baudrate):
@@ -323,7 +323,11 @@ class LewansoulMotorsBus:
 
             values.append(value)
 
-        print(values)
+        if(self.port == "/dev/ttyUSB0"):
+            print('LEADER:', values)
+        else:
+            print('FOLLOW:', values)
+
         values = np.array(values, dtype=np.float32)
         return values
     
@@ -355,15 +359,22 @@ class LewansoulMotorsBus:
 
         for idx, value in zip(motor_ids, values, strict=True):
             if data_name == "Goal_Position": 
-                #print('port, WriteAngle:', self.port, value)
                 if(self.port == "/dev/ttyUSB0"):
                     LX16A._controller = self.controller0
-                    value = self.servoLead[idx].move(angle=value, time=100)
+                    current_angle = self.servoLead[idx].get_physical_angle()
                 else:
                     LX16A._controller = self.controller1
-                    value = self.servoFollow[idx].move(angle=value, time=100)
+                    current_angle = self.servoFollow[idx].get_physical_angle()
+                    diff = abs(current_angle  - value)
+                    Tmoving = int(diff * 30.0)
+                    if (Tmoving) > 255:
+                        Tmoving = 255
+                    if abs(diff) >= 1.5:
+                        print('Move:', idx, current_angle, value, Tmoving)
+                        self.servoFollow[idx].move(angle=value, time=Tmoving)
+                        time.sleep(0.1)
+
             elif data_name == "Torque_Enable":
-                #print('port, Torque:', self.port, value)
                 if(self.port == "/dev/ttyUSB0"):
                     LX16A._controller = self.controller0
                     value = self.servoLead[idx].set_torque(torque=value)
