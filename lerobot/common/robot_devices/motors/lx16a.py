@@ -82,18 +82,13 @@ class _BSpline:
 
 
 class LX16A:
-    _controller = None
-
+    
     @staticmethod
-    def initialize(port: str, timeout: float = 0.02) -> None:
-        if LX16A._controller is not None:
-            LX16A._controller.reset_input_buffer()
-            LX16A._controller.reset_output_buffer()
-            LX16A._controller.close()
-
+    def initialize(port: str, timeout: float = 0.02):
         LX16A._controller = serial.Serial(
             port=port, baudrate=115200, timeout=timeout, write_timeout=timeout
         )
+        return LX16A._controller
 
     def deinitialize(port: str, timeout: float = 0.02) -> None:
         LX16A._controller.reset_input_buffer()
@@ -371,6 +366,11 @@ class LX16A:
         packet = [self._id, 7, 29, 0, 0, 0, 0]
         LX16A._send_packet(packet)
         self._motor_mode = False
+
+    def set_torque(self, torque: int) -> None:
+        packet = [self._id, 4, 31, torque]
+        LX16A._send_packet(packet)
+        self._torque_enabled = torque
 
     def enable_torque(self) -> None:
         packet = [self._id, 4, 31, 1]

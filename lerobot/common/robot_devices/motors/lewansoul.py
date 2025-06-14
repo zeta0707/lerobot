@@ -36,28 +36,11 @@ MAX_ID_RANGE = 6
 # which corresponds to a half rotation on the left and half rotation on the right.
 # Some joints might require higher range, so we allow up to [-270, 270] degrees until
 # an error is raised.
-LOWER_BOUND_DEGREE = -270
-UPPER_BOUND_DEGREE = 270
-# For joints in percentage (i.e. joints that move linearly like the prismatic joint of a gripper),
-# their nominal range is [0, 100] %. For instance, for Aloha gripper, 0% is fully
-# closed, and 100% is fully open. To account for slight calibration issue, we allow up to
-# [-10, 110] until an error is raised.
-LOWER_BOUND_LINEAR = -10
-UPPER_BOUND_LINEAR = 110
-
-HALF_TURN_DEGREE = 180
-
+LOWER_BOUND_DEGREE = 0.0
+UPPER_BOUND_DEGREE = 240.0
 
 # See this link for LX-16A Command
 # https://github.com/madhephaestus/lx16a-servo/blob/master/lx-16a%20LewanSoul%20Bus%20Servo%20Communication%20Protocol.pdf
-LX16A_CONTROL_TABLE = {
-    #write bool
-    "Torque_Enable": (31, 1),
-    #read 2 bytes
-    "Present_Position": (28, 2),
-    #write 4 bytes, 2: angle 2: move time
-    "Goal_Position": (7, 4),
-}
 
 LX16A_SERIES_BAUDRATE_TABLE = {
     0: 115_200,
@@ -65,10 +48,6 @@ LX16A_SERIES_BAUDRATE_TABLE = {
 
 CALIBRATION_REQUIRED = ["Goal_Position", "Present_Position"]
 CONVERT_UINT32_TO_INT32_REQUIRED = ["Goal_Position", "Present_Position"]
-
-MODEL_CONTROL_TABLE = {
-    "lx16a": LX16A_CONTROL_TABLE,
-}
 
 MODEL_RESOLUTION = {
     "lx16a": 4096,
@@ -144,7 +123,7 @@ class LewansoulMotorsBus:
     ```bash
     python lerobot/scripts/find_motors_bus_port.py
     >>> Finding all available ports for the MotorsBus.
-    >>> ['/dev/tty.usbmodem575E0032081', '/dev/tty.usbmodem575E0031751']
+    >>> ['/dev/ttyUSB0', '/dev/ttyUSB1']
     >>> Remove the usb cable from your LewansoulMotorsBus and press Enter when done.
     >>> The port of this LewansoulMotorsBus is /dev/ttyUSB0
     >>> Reconnect the usb cable.
@@ -180,16 +159,13 @@ class LewansoulMotorsBus:
     ):
         self.port = config.port
         self.motors = config.motors
-        self.mock = config.mock
-
-        self.model_ctrl_table = deepcopy(MODEL_CONTROL_TABLE)
-        self.model_resolution = deepcopy(MODEL_RESOLUTION)
 
         self.calibration = None
         self.is_connected = False
         self.logs = {}
-
         self.track_positions = {}
+        self.controller0 = None         #leader serial port
+        self.controller1 = None         #follower serial port
 
     def connect(self):
         if self.is_connected:
@@ -198,7 +174,27 @@ class LewansoulMotorsBus:
             )
 
         try:
-            LX16A.initialize(self.port, TIMEOUT_MS)
+            print(
+                "\nPort Init, made LX16A 6 classes.\n"
+            )
+
+            if(self.port == "/dev/ttyUSB1"):
+                # serila port initialize
+                self.controller1 = LX16A.initialize(self.port, TIMEOUT_MS)
+                LX16A._controller = self.controller1
+                self.servoFollow = {}
+                for i in range(1, MAX_ID_RANGE+1):
+                    self.servoFollow[i] = LX16A(id_=i, disable_torque=1)
+                    time.sleep(0.2)           
+            else:
+                # serila port initialize
+                self.controller0  = LX16A.initialize(self.port, TIMEOUT_MS)
+                LX16A._controller = self.controller0
+                self.servoLead = {}
+                for i in range(1, MAX_ID_RANGE+1):
+                    self.servoLead[i] = LX16A(id_=i, disable_torque=1)
+                    time.sleep(0.2)                  
+
         except Exception:
             traceback.print_exc()
             print(
@@ -308,25 +304,23 @@ class LewansoulMotorsBus:
             motor_ids.append(motor_idx)
             models.append(model)
 
-        assert_same_address(self.model_ctrl_table, models, data_name)
-        addr, bytes = self.model_ctrl_table[model][data_name]
-
         values = []
-        for idx in motor_ids:
-            packet = [idx, 3, addr]
-            #print('ReadPkt:', packet)
-            LX16A._send_packet(packet)
 
-            #need to modify or extend, servo angle type
-            received = LX16A._read_packet(bytes, idx)
-            if bytes == 1:
-                value = received[0] 
-            elif bytes == 2:
-                value = received[0] + received[1] * 256
-            
-            #conver to angle
-            if addr == 28:
-                value = LX16A._from_servo_range(value)
+        for idx in motor_ids:
+            if data_name == "Present_Position": 
+                if(self.port == "/dev/ttyUSB0"):
+                    LX16A._controller = self.controller0
+                    value = self.servoLead[idx].get_physical_angle()
+                else:
+                    LX16A._controller = self.controller1
+                    value = self.servoFollow[idx].get_physical_angle()
+                #print('port, ReadAngle:', self.port, value)
+                #Limit here, for wrong value
+                if value < LOWER_BOUND_DEGREE:
+                    value = LOWER_BOUND_DEGREE
+                elif value > UPPER_BOUND_DEGREE:
+                    value = UPPER_BOUND_DEGREE
+
             values.append(value)
 
         print(values)
@@ -359,17 +353,23 @@ class LewansoulMotorsBus:
 
         values = values.tolist()
 
-        assert_same_address(self.model_ctrl_table, models, data_name)
-        addr, bytes = self.model_ctrl_table[model][data_name]
         for idx, value in zip(motor_ids, values, strict=True):
-            value = LX16A._to_servo_range(value)
-            #move motor with timeout 100ms
-            if addr == 7: 
-                packet = [idx, bytes+3, addr, *LX16A._to_bytes(value), *LX16A._to_bytes(100)]
-            else:
-                packet = [idx, bytes+3, addr, value]
-            #print('WritePKT:', packet)
-            LX16A._send_packet(packet)
+            if data_name == "Goal_Position": 
+                #print('port, WriteAngle:', self.port, value)
+                if(self.port == "/dev/ttyUSB0"):
+                    LX16A._controller = self.controller0
+                    value = self.servoLead[idx].move(angle=value, time=100)
+                else:
+                    LX16A._controller = self.controller1
+                    value = self.servoFollow[idx].move(angle=value, time=100)
+            elif data_name == "Torque_Enable":
+                #print('port, Torque:', self.port, value)
+                if(self.port == "/dev/ttyUSB0"):
+                    LX16A._controller = self.controller0
+                    value = self.servoLead[idx].set_torque(torque=value)
+                else:
+                    LX16A._controller = self.controller1
+                    value = self.servoFollow[idx].set_torque(torque=value)
 
     def disconnect(self):
         if not self.is_connected:
